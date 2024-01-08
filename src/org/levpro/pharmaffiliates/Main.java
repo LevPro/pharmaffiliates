@@ -76,7 +76,7 @@ public class Main {
             Elements childrensLinks = categoryDocument.select(".alpahbatic-container .cat-box");
 
             for (Element childrenLink : childrensLinks) {
-                String childrenLinkUrl = childrenLink.select("a").get(0).attr("href");
+                String childrenLinkUrl = childrenLink.select("a").get(0).attr("href").replace(" ", "%20");
                 String childrenLinkName = childrenLink.select("a").get(0).text();
 
                 System.out.println(String.format("Add children %s - %s", childrenLinkUrl, childrenLinkName));
@@ -89,7 +89,7 @@ public class Main {
             Elements productsLinks = categoryDocument.select(".main-page .productbox");
 
             for (Element productLink : productsLinks) {
-                String productLinkUrl = productLink.select(".product-details .btn-hover").get(0).attr("href");
+                String productLinkUrl = productLink.select(".product-details .btn-hover").get(0).attr("href").replace(" ", "%20");
                 String productLinkName = productLink.select(".prodcut-title-name h2").get(0).text().replace("\r\n", " ").trim();
                 String productLinkImage = productLink.select(".image-container img").get(0).attr("src");
 
@@ -118,7 +118,7 @@ public class Main {
                 Elements childrensChildrensLinks = childrenDocument.select(".alpahbatic-container .cat-box");
 
                 for (Element childrenChildrenLink : childrensChildrensLinks) {
-                    String childrenChildrenUrl = childrenChildrenLink.select("a").get(0).attr("href");
+                    String childrenChildrenUrl = childrenChildrenLink.select("a").get(0).attr("href").replace(" ", "%20");
                     String childrenChildrenName = childrenChildrenLink.select("a").get(0).text();
 
                     System.out.println(String.format("Add children %s - %s", childrenChildrenUrl, childrenChildrenName));
@@ -163,7 +163,7 @@ public class Main {
                 Elements childrenProductsLinks = childrenDocument.select(".main-page .productbox");
 
                 for (Element childrenProductsLink : childrenProductsLinks) {
-                    String childrenProductsLinkUrl = childrenProductsLink.select(".product-details .btn-hover").get(0).attr("href");
+                    String childrenProductsLinkUrl = childrenProductsLink.select(".product-details .btn-hover").get(0).attr("href").replace(" ", "%20");
                     String childrenProductsLinkName = childrenProductsLink.select(".prodcut-title-name h2").get(0).text().replace("\r\n", " ").trim();
                     String childrenProductsLinkImage = childrenProductsLink.select(".image-container img").get(0).attr("src");
 
