@@ -15,6 +15,7 @@ import java.util.Map;
 import org.levpro.pharmaffiliates.models.Categories;
 import org.levpro.pharmaffiliates.models.Childrens;
 import org.levpro.pharmaffiliates.models.Products;
+import org.levpro.pharmaffiliates.models.Temp;
 import org.levpro.pharmaffiliates.utils.PageLoader;
 
 public class Main {
@@ -30,16 +31,62 @@ public class Main {
             resultDir.mkdir();
         }
 
+        System.out.println("Get products data file");
+
+        File productsResultJsonFile = new File(resultDir, "products.json");
+
+        System.out.println("Get temp data file");
+
+        if (productsResultJsonFile.exists()) {
+            BufferedReader productsResultBuffer = new BufferedReader(new FileReader(productsResultJsonFile));
+
+            StringBuilder productsResultStringBuffer = new StringBuilder();
+
+            String productsResultLine;
+
+            while ((productsResultLine = productsResultBuffer.readLine()) != null) {
+                productsResultStringBuffer.append(productsResultLine);
+            }
+
+            productsResultBuffer.close();
+
+            String tempJsonString = productsResultStringBuffer.toString();
+
+            productsResult = new Gson().fromJson(tempJsonString, productsResult.getClass());
+        }
+
+        Map<String, Temp> temp = new HashMap<>();
+
+        File tempJsonFile = new File(resultDir, "temp.json");
+
+        if (tempJsonFile.exists()) {
+            BufferedReader tempBuffer = new BufferedReader(new FileReader(tempJsonFile));
+
+            StringBuilder tempStringBuffer = new StringBuilder();
+
+            String tempLine;
+
+            while ((tempLine = tempBuffer.readLine()) != null) {
+                tempStringBuffer.append(tempLine);
+            }
+
+            tempBuffer.close();
+
+            String tempJsonString = tempStringBuffer.toString();
+
+            temp = new Gson().fromJson(tempJsonString, temp.getClass());
+        }
+
         File inputDataFile = new File(System.getProperty("user.dir"), "data.json");
 
         BufferedReader inputDataBuffer = new BufferedReader(new FileReader(inputDataFile));
 
         StringBuilder inputDataStringBuffer = new StringBuilder();
 
-        String line;
+        String inputDataLine;
 
-        while ((line = inputDataBuffer.readLine()) != null) {
-            inputDataStringBuffer.append(line);
+        while ((inputDataLine = inputDataBuffer.readLine()) != null) {
+            inputDataStringBuffer.append(inputDataLine);
         }
 
         inputDataBuffer.close();
@@ -51,62 +98,110 @@ public class Main {
         inputData = new Gson().fromJson(inputDataJsonString, inputData.getClass());
 
         for (Map<String, Object> category : (ArrayList<Map<String, Object>>) inputData.get("categories")) {
+            if (temp.containsKey(category.get("url"))) {
+                System.out.println(String.format("%s found in temp data", category.get("url")));
+            }
+
             System.out.println("Add to collection");
 
             categoriesResult.add(new Categories((String) category.get("url"), (String) category.get("name"), "", ""));
 
             ArrayList<Childrens> childrens = new ArrayList<>();
 
-            System.out.println(String.format("Load %s", category.get("url")));
+            ArrayList<String> parsedLinks = new ArrayList<>();
 
-            String categoryOutput;
+            Temp tempItem = new Temp();
 
-            try {
-                categoryOutput = PageLoader.load((String) category.get("url"), "GET");
-            } catch (Exception exception) {
-                System.out.println(String.format("Load error %s", exception));
+            if (!temp.containsKey(category.get("url"))) {
+                System.out.println(String.format("Load %s", category.get("url")));
 
-                continue;
+                String categoryOutput;
+
+                try {
+                    categoryOutput = PageLoader.load((String) category.get("url"), "GET");
+                } catch (Exception exception) {
+                    System.out.println(String.format("Load error %s", exception));
+
+                    continue;
+                }
+
+                Document categoryDocument = Jsoup.parse(categoryOutput, "", Parser.xmlParser());
+
+                System.out.println("Get childrens");
+
+                Elements childrensLinks = categoryDocument.select(".alpahbatic-container .cat-box");
+
+                for (Element childrenLink : childrensLinks) {
+                    String childrenLinkUrl = childrenLink.select("a").get(0).attr("href").replace(" ", "%20");
+                    String childrenLinkName = childrenLink.select("a").get(0).text();
+
+                    System.out.println(String.format("Add children %s - %s", childrenLinkUrl, childrenLinkName));
+
+                    childrens.add(new Childrens(childrenLinkUrl, childrenLinkName));
+                }
+
+                System.out.println("Get products");
+
+                Elements productsLinks = categoryDocument.select(".main-page .productbox");
+
+                for (Element productLink : productsLinks) {
+                    String productLinkUrl = productLink.select(".product-details .btn-hover").get(0).attr("href").replace(" ", "%20");
+                    String productLinkName = productLink.select(".prodcut-title-name h2").get(0).text().replace("\r\n", " ").trim();
+                    String productLinkImage = productLink.select(".image-container img").get(0).attr("src");
+
+                    System.out.println(String.format("Add products url %s - %s", productLinkUrl, productLinkName));
+
+                    productsResult.add(new Products(productLinkUrl, (String) category.get("name"), productLinkName, productLinkImage));
+                }
+
+                if (!productsResult.isEmpty()) {
+                    System.out.println("Save products");
+
+                    FileWriter productsFileWriter = new FileWriter(productsResultJsonFile);
+                    productsFileWriter.write(new Gson().toJson(productsResult));
+                    productsFileWriter.close();
+                }
+
+                System.out.println("Save temp data");
+
+                tempItem.setChildrens(childrens);
+
+                temp.put((String) category.get("url"), tempItem);
+
+                FileWriter tempFileWriter = new FileWriter(tempJsonFile);
+                tempFileWriter.write(new Gson().toJson(temp));
+                tempFileWriter.close();
+            } else {
+                System.out.println("Get childrens from temp data");
+
+                childrens.addAll(temp.get(category.get("url")).getChildrens());
+
+                System.out.println("Get early parsed links from temp data");
+
+                parsedLinks.addAll(temp.get(category.get("url")).getParsed());
             }
+            
+            int childrensIndex = 0;
 
-            Document categoryDocument = Jsoup.parse(categoryOutput, "", Parser.xmlParser());
+            while (childrensIndex < childrens.size()) {
+                if (parsedLinks.contains(childrens.get(childrensIndex).getUrl())) {
+                    System.out.println(String.format("%s parse early", childrens.get(childrensIndex).getUrl()));
 
-            System.out.println("Get childrens");
+                    childrensIndex++;
 
-            Elements childrensLinks = categoryDocument.select(".alpahbatic-container .cat-box");
+                    continue;
+                }
 
-            for (Element childrenLink : childrensLinks) {
-                String childrenLinkUrl = childrenLink.select("a").get(0).attr("href").replace(" ", "%20");
-                String childrenLinkName = childrenLink.select("a").get(0).text();
-
-                System.out.println(String.format("Add children %s - %s", childrenLinkUrl, childrenLinkName));
-
-                childrens.add(new Childrens(childrenLinkUrl, childrenLinkName));
-            }
-
-            System.out.println("Get products");
-
-            Elements productsLinks = categoryDocument.select(".main-page .productbox");
-
-            for (Element productLink : productsLinks) {
-                String productLinkUrl = productLink.select(".product-details .btn-hover").get(0).attr("href").replace(" ", "%20");
-                String productLinkName = productLink.select(".prodcut-title-name h2").get(0).text().replace("\r\n", " ").trim();
-                String productLinkImage = productLink.select(".image-container img").get(0).attr("src");
-
-                System.out.println(String.format("Add products url %s - %s", productLinkUrl, productLinkName));
-
-                productsResult.add(new Products(productLinkUrl, (String) category.get("name"), productLinkName, productLinkImage));
-            }
-
-            while (!childrens.isEmpty()) {
-                System.out.println(String.format("Load %s", childrens.get(0).getUrl()));
+                System.out.println(String.format("Load %s", childrens.get(childrensIndex).getUrl()));
 
                 String childrenOutput;
 
                 try {
-                    childrenOutput = PageLoader.load(childrens.get(0).getUrl(), "GET");
+                    childrenOutput = PageLoader.load(childrens.get(childrensIndex).getUrl(), "GET");
                 } catch (Exception exception) {
                     System.out.println(String.format("Load error %s", exception));
+
+                    childrensIndex++;
 
                     continue;
                 }
@@ -135,7 +230,7 @@ public class Main {
                 if (childrenNameElement.isEmpty()) {
                     System.out.println("Name not found");
 
-                    childrens.remove(0);
+                    childrensIndex++;
 
                     continue;
                 }
@@ -156,7 +251,7 @@ public class Main {
 
                 System.out.println("Add to collection");
 
-                categoriesResult.add(new Categories(childrens.get(0).getUrl(), childrenName, childrenDescription, childrens.get(0).getName()));
+                categoriesResult.add(new Categories(childrens.get(childrensIndex).getUrl(), childrenName, childrenDescription, childrens.get(childrensIndex).getName()));
 
                 System.out.println("Get products");
 
@@ -172,7 +267,26 @@ public class Main {
                     productsResult.add(new Products(childrenProductsLinkUrl, childrenName, childrenProductsLinkName, childrenProductsLinkImage));
                 }
 
-                childrens.remove(0);
+                if (!productsResult.isEmpty()) {
+                    System.out.println("Save products");
+
+                    FileWriter productsFileWriter = new FileWriter(productsResultJsonFile);
+                    productsFileWriter.write(new Gson().toJson(productsResult));
+                    productsFileWriter.close();
+                }
+
+                System.out.println("Save temp data");
+
+                tempItem.setChildrens(childrens);
+                tempItem.addParsed(childrens.get(childrensIndex).getUrl());
+
+                temp.put((String) category.get("url"), tempItem);
+
+                FileWriter tempFileWriter = new FileWriter(tempJsonFile);
+                tempFileWriter.write(new Gson().toJson(temp));
+                tempFileWriter.close();
+
+                childrensIndex++;
             }
         }
 
@@ -188,7 +302,37 @@ public class Main {
 
         categoriesResult.clear();
 
+        temp.clear();
+
+        ArrayList<String> parsedProductsLinks = new ArrayList<>();
+
+        File parsedProductsLinksJsonFile = new File(resultDir, "parse_products_pinks.json");
+
+        if (parsedProductsLinksJsonFile.exists()) {
+            BufferedReader parsedProductsLinksBuffer = new BufferedReader(new FileReader(parsedProductsLinksJsonFile));
+
+            StringBuilder parsedProductsLinksStringBuffer = new StringBuilder();
+
+            String parsedProductsLinksLine;
+
+            while ((parsedProductsLinksLine = parsedProductsLinksBuffer.readLine()) != null) {
+                parsedProductsLinksStringBuffer.append(parsedProductsLinksLine);
+            }
+
+            parsedProductsLinksBuffer.close();
+
+            String parsedProductsLinksJsonString = parsedProductsLinksStringBuffer.toString();
+
+            parsedProductsLinks = new Gson().fromJson(parsedProductsLinksJsonString, parsedProductsLinks.getClass());
+        }
+
         for (int index = 0; index < productsResult.size(); index++) {
+            if (parsedProductsLinks.contains(productsResult.get(index).getUrl())) {
+                System.out.println(String.format("%s parsed early", productsResult.get(index).getUrl()));
+
+                continue;
+            }
+
             System.out.println(String.format("Load %s", productsResult.get(index).getUrl()));
 
             String productOutput;
@@ -232,14 +376,22 @@ public class Main {
             for (Element productParam: productParams) {
                 productsResult.get(index).addParam(productParam.select("td").get(0).text().replace("\r\n", " ").trim(), productParam.select("td").get(1).text().replace("\r\n", " ").trim());
             }
+
+            System.out.println("Save products");
+
+            FileWriter productsFileWriter = new FileWriter(productsResultJsonFile);
+            productsFileWriter.write(new Gson().toJson(productsResult));
+            productsFileWriter.close();
+
+            System.out.println("Save parsed links");
+
+            parsedProductsLinks.add(productsResult.get(index).getUrl());
+
+            FileWriter parsedProductsLinksFileWriter = new FileWriter(parsedProductsLinksJsonFile);
+            parsedProductsLinksFileWriter.write(new Gson().toJson(parsedProductsLinks));
+            parsedProductsLinksFileWriter.close();
         }
 
-        System.out.println("Save products");
-
-        File productsResultJsonFile = new File(resultDir, "products.json");
-
-        FileWriter productsFileWriter = new FileWriter(productsResultJsonFile);
-        productsFileWriter.write(new Gson().toJson(productsFileWriter));
-        productsFileWriter.close();
+        System.out.println("Program complete");
     }
 }
