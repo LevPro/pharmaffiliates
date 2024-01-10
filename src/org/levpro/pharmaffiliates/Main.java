@@ -1,6 +1,7 @@
 package org.levpro.pharmaffiliates;
 
 import com.google.gson.Gson;
+import com.google.gson.reflect.TypeToken;
 import org.jsoup.Jsoup;
 import org.jsoup.nodes.Document;
 import org.jsoup.nodes.Element;
@@ -8,6 +9,7 @@ import org.jsoup.parser.Parser;
 import org.jsoup.select.Elements;
 
 import java.io.*;
+import java.lang.reflect.Type;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Map;
@@ -70,7 +72,9 @@ public class Main {
 
             String categoriesResultJsonString = categoriesResultStringBuffer.toString();
 
-            categoriesResult = new Gson().fromJson(categoriesResultJsonString, categoriesResult.getClass());
+            Type categoriesListType = new TypeToken<ArrayList<Categories>>(){}.getType();
+
+            categoriesResult = new Gson().fromJson(categoriesResultJsonString, categoriesListType);
         };
 
         System.out.println("Get products data file");
@@ -94,7 +98,9 @@ public class Main {
 
             String productsResultJsonString = productsResultStringBuffer.toString();
 
-            productsResult = new Gson().fromJson(productsResultJsonString, productsResult.getClass());
+            Type productsListType = new TypeToken<ArrayList<Products>>(){}.getType();
+
+            productsResult = new Gson().fromJson(productsResultJsonString, productsListType);
         };
 
         System.out.println("Get childrens data file");
@@ -118,7 +124,9 @@ public class Main {
 
             String childrensJsonString = parsedProductsLinksStringBuffer.toString();
 
-            childrens = new Gson().fromJson(childrensJsonString, childrens.getClass());
+            Type childrensListType = new TypeToken<ArrayList<Childrens>>(){}.getType();
+
+            childrens = new Gson().fromJson(childrensJsonString, childrensListType);
         }
 
         System.out.println("Load input links from file");
